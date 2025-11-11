@@ -7,12 +7,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-/**
- * Endpoint seguro para autenticación. El frontend NO recibe ni usuario ni clave.
- * Añade tus credenciales en Railway Variables:
- * HACIENDA_USER=cpf-03-0404-0701@prod.comprobanteselectronicos.go.cr
- * HACIENDA_PASS=TU_CLAVE_AQUI
- */
+
 app.post('/token', async (req, res) => {
   try {
     const targetUrl = 'https://idp.comprobanteselectronicos.go.cr/auth/realms/rut/protocol/openid-connect/token';
