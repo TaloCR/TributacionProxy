@@ -4,13 +4,43 @@ const fetch = require('node-fetch');
 
 const app = express();
 app.use(cors());
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 /**
- * Proxy endpoint: maneja GET, POST, PUT, etc.
- * Reenvía correctamente body en urlencoded, JSON, o texto plano.
+ * Endpoint seguro para autenticación. El frontend NO recibe ni usuario ni clave.
+ * Añade tus credenciales en Railway Variables:
+ * HACIENDA_USER=cpf-03-0404-0701@prod.comprobanteselectronicos.go.cr
+ * HACIENDA_PASS=TU_CLAVE_AQUI
+ */
+app.post('/token', async (req, res) => {
+  try {
+    const targetUrl = 'https://idp.comprobanteselectronicos.go.cr/auth/realms/rut/protocol/openid-connect/token';
+    const params = new URLSearchParams();
+    params.append('grant_type', 'password');
+    params.append('username', process.env.HACIENDA_USER);
+    params.append('password', process.env.HACIENDA_PASS);
+    params.append('client_id', 'api-prod');
+
+    const response = await fetch(targetUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString()
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      return res.status(response.status).json({ error: data });
+    }
+    res.json(data); // El frontend solo recibe el token
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+/**
+ * Proxy CORS universal: permite saltar restricciones CORS para otros endpoints.
+ * En el frontend, uso: https://tributacionproxy.up.railway.app/?url=https://API_DESTINO
  */
 app.all('/', async (req, res) => {
   const targetUrl = req.query.url;
@@ -25,7 +55,6 @@ app.all('/', async (req, res) => {
     let body = undefined;
     if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
       if (req.is('application/x-www-form-urlencoded')) {
-        // Recibe como objeto, envía como formdata string
         body = new URLSearchParams(req.body).toString();
       } else if (req.is('application/json')) {
         body = JSON.stringify(req.body);
@@ -34,7 +63,6 @@ app.all('/', async (req, res) => {
       }
     }
 
-    // Realizar fetch al destino
     const response = await fetch(targetUrl, {
       method: req.method,
       headers: customHeaders,
@@ -54,5 +82,5 @@ app.all('/', async (req, res) => {
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
-  console.log(`Proxy CORS actualizado activo en puerto ${PORT}`);
+  console.log(`Proxy CORS activo en puerto ${PORT}`);
 });
